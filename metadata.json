@@ -1,0 +1,7 @@
+{
+  "name": "Good Health AI",
+  "description": "An AI-powered platform for instant health advice, symptom analysis, and visual consultation, leveraging the Gemini API for a comprehensive and interactive user experience.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

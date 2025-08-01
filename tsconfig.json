@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*",
+    "pages/**/*",
+    "components/**/*",
+    "contexts/**/*",
+    "services/clientAuthService.ts",
+    "services/clientBookingService.ts",
+    "services/clientDatabaseService.ts",
+    "services/databaseService.ts",
+    "types/**/*",
+    "*.ts",
+    "*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "services/authService.ts",
+    "services/bookingService.ts",
+    "services/postgresqlDatabaseService.ts",
+    "config/database.ts",
+    "scripts/**/*"
+  ]
+}
