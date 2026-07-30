@@ -6,7 +6,19 @@ const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// A hardcoded fallback secret here would let anyone forge valid JWTs against a
+// production deployment that forgot to set JWT_SECRET. In production, fail
+// fast instead. In development, generate a random per-process secret so
+// tokens still work locally without a real secret ever being committed.
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable must be set in production');
+  }
+  JWT_SECRET = require('crypto').randomBytes(32).toString('hex');
+  console.warn('[dev] JWT_SECRET not set - using an ephemeral random secret for this process only.');
+}
 
 // Middleware
 app.use(cors({
@@ -470,13 +482,26 @@ app.put('/api/users/:id', authenticateToken, async (req, res) => {
       });
     }
     
-    const { password, ...updateData } = req.body;
-    
+    const { password, ...rawUpdateData } = req.body;
+
+    // Mass-assignment fix: only allow updating a fixed set of self-service
+    // profile fields. Without this whitelist, a user could PUT
+    // { "role": "admin" } (or isActive, id, passwordHash, etc.) to their own
+    // profile and escalate privileges, since the old code spread the entire
+    // request body directly onto the stored user record.
+    const ALLOWED_SELF_UPDATE_FIELDS = ['name', 'phone', 'dateOfBirth', 'gender', 'address'];
+    const updateData = {};
+    for (const field of ALLOWED_SELF_UPDATE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(rawUpdateData, field)) {
+        updateData[field] = rawUpdateData[field];
+      }
+    }
+
     // If password is being updated, hash it
     if (password) {
       updateData.passwordHash = await bcrypt.hash(password, 12);
     }
-    
+
     users[userIndex] = {
       ...users[userIndex],
       ...updateData,
