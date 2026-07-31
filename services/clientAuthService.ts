@@ -1,7 +1,7 @@
 // Client-side Auth Service for Good Health AI
 // This service makes API calls to the backend instead of direct database connections
 
-import { clientDatabaseService, User, Doctor, Appointment } from './clientDatabaseService';
+import { clientDatabaseService, User, Doctor, Appointment, VerificationDocument } from './clientDatabaseService';
 import { STORAGE_KEYS } from '../constants/storage';
 import { resolveApiUrl } from '../utils/apiUrl';
 
@@ -13,6 +13,7 @@ export interface UserData {
   gender: string;
   address: string;
   profilePicture?: string;
+  identityDocument: VerificationDocument;
 }
 
 export interface DoctorData {
@@ -25,6 +26,11 @@ export interface DoctorData {
   bio?: string;
   consultationFee: number;
   profilePicture?: string;
+  licenseNumber: string;
+  professionalRegistrationNumber: string;
+  hospitalAffiliation: string;
+  identityDocument: VerificationDocument;
+  qualificationDocument: VerificationDocument;
 }
 
 export interface LoginCredentials {
@@ -197,7 +203,7 @@ class ClientAuthService {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        this.setSession(result.user, result.token);
+        if (result.token) this.setSession(result.user, result.token);
         return result;
       } else {
         return {
@@ -205,12 +211,13 @@ class ClientAuthService {
           message: result.message || 'Registration failed'
         };
       }
-    } catch (error) {
-      console.error('Registration error:', error);
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.'
-      };
+    } catch {
+      const users: User[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+      if (users.some(user => user.email.toLowerCase() === userData.email.toLowerCase())) return { success: false, message: 'An account with this email already exists.' };
+      const now = new Date().toISOString();
+      const user: User = { id: crypto.randomUUID(), ...userData, passwordHash: password, role: 'patient', isActive: false, verificationStatus: 'pending', createdAt: now, updatedAt: now };
+      users.push(user); localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      return { success: true, user, message: 'Identity evidence submitted for administrator review.' };
     }
   }
 
@@ -228,7 +235,7 @@ class ClientAuthService {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        this.setSession(result.user, result.token);
+        if (result.token) this.setSession(result.user, result.token);
         return result;
       } else {
         return {
@@ -236,12 +243,13 @@ class ClientAuthService {
           message: result.message || 'Doctor registration failed'
         };
       }
-    } catch (error) {
-      console.error('Doctor registration error:', error);
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.'
-      };
+    } catch {
+      const doctors: Doctor[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCTORS) || '[]');
+      if (doctors.some(doctor => doctor.email.toLowerCase() === doctorData.email.toLowerCase())) return { success: false, message: 'An account with this email already exists.' };
+      const now = new Date().toISOString();
+      const doctor: Doctor = { id: crypto.randomUUID(), ...doctorData, passwordHash: password, rating: 0, totalReviews: 0, isVerified: false, isAvailable: false, verificationStatus: 'pending', createdAt: now, updatedAt: now };
+      doctors.push(doctor); localStorage.setItem(STORAGE_KEYS.DOCTORS, JSON.stringify(doctors));
+      return { success: true, user: doctor, message: 'Professional credentials submitted for administrator review.' };
     }
   }
 
@@ -275,6 +283,9 @@ class ClientAuthService {
       ] as Array<User | Doctor>;
       const person = people.find(item => item.email.toLowerCase() === credentials.email.trim().toLowerCase() && item.passwordHash === credentials.password);
       if (person) {
+        if (person.verificationStatus === 'pending' || ('isActive' in person && !person.isActive) || ('isVerified' in person && !person.isVerified)) {
+          return { success: false, message: 'Your account is awaiting administrator approval.' };
+        }
         const token = `demo.${person.id}.${Date.now()}`;
         this.setSession(person, token);
         return { success: true, user: person, token };

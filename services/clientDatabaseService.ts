@@ -12,6 +12,8 @@ export interface User {
   profilePicture?: string;
   role: 'patient' | 'admin';
   isActive: boolean;
+  verificationStatus?: 'pending' | 'approved' | 'rejected';
+  identityDocument?: VerificationDocument;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +41,19 @@ export interface Doctor {
   createdAt: string;
   updatedAt: string;
   passwordHash?: string; // Added for authentication
+  verificationStatus?: 'pending' | 'approved' | 'rejected';
+  licenseNumber?: string;
+  professionalRegistrationNumber?: string;
+  identityDocument?: VerificationDocument;
+  qualificationDocument?: VerificationDocument;
+}
+
+export interface VerificationDocument {
+  type: string;
+  number?: string;
+  fileName: string;
+  dataUrl?: string;
+  submittedAt: string;
 }
 
 export interface Appointment {

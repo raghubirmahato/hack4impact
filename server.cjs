@@ -142,7 +142,19 @@ const initializeSampleData = () => {
       name: "Test Patient",
       email: "patient1@test.com",
       passwordHash: bcrypt.hashSync("password123", 10),
-      role: "patient"
+      role: "patient",
+      isActive: true,
+      verificationStatus: 'approved'
+    },
+    {
+      id: uuidv4(),
+      name: 'Platform Admin',
+      email: 'admin@demo.com',
+      passwordHash: bcrypt.hashSync('demo123', 10),
+      phone: '',
+      role: 'admin',
+      isActive: true,
+      verificationStatus: 'approved'
     }
   ];
 };
@@ -207,13 +219,13 @@ const errorHandler = (err, req, res, next) => {
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password, phone, dateOfBirth, gender, address } = req.body;
+    const { name, email, password, phone, dateOfBirth, gender, address, identityDocument } = req.body;
     
     // Validation
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !identityDocument?.type || !identityDocument?.number || !identityDocument?.fileName) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Name, email, and password are required' 
+        message: 'Name, email, password, and a government-issued identity document are required' 
       });
     }
     
@@ -240,24 +252,22 @@ app.post('/api/auth/register', async (req, res) => {
       gender: gender || '',
       address: address || '',
       role: 'patient',
-      isActive: true,
+      isActive: false,
+      verificationStatus: 'pending',
+      identityDocument,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     
     users.push(newUser);
     
-    // Generate token
-    const token = generateToken(newUser);
-    
     // Return user without password
     const { passwordHash: _, ...userResponse } = newUser;
     
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
-      user: userResponse,
-      token
+      message: 'Identity evidence submitted for administrator review',
+      user: userResponse
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -279,14 +289,15 @@ app.post('/api/auth/register-doctor', async (req, res) => {
     
     const { 
       name, email, password, phone, specialization, 
-      yearsOfExperience, qualification, bio, consultationFee 
+      yearsOfExperience, qualification, bio, consultationFee, licenseNumber,
+      professionalRegistrationNumber, hospitalAffiliation, identityDocument, qualificationDocument
     } = doctorInfo;
     
     // Validation
-    if (!name || !email || !password || !specialization) {
+    if (!name || !email || !password || !specialization || !licenseNumber || !professionalRegistrationNumber || !hospitalAffiliation || !identityDocument?.fileName || !qualificationDocument?.fileName) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Name, email, password, and specialization are required' 
+        message: 'Complete professional credentials and identity documents are required' 
       });
     }
     
@@ -312,11 +323,17 @@ app.post('/api/auth/register-doctor', async (req, res) => {
       specialization,
       yearsOfExperience: parseInt(yearsOfExperience) || 0,
       qualification: qualification || '',
+      licenseNumber,
+      professionalRegistrationNumber,
+      hospitalAffiliation,
+      identityDocument,
+      qualificationDocument,
       bio: bio || '',
       rating: 0,
       totalReviews: 0,
-      isVerified: true,
-      isAvailable: true,
+      isVerified: false,
+      isAvailable: false,
+      verificationStatus: 'pending',
       consultationFee: parseInt(consultationFee) || 100,
       availability: [
         { dayOfWeek: 1, startTime: '09:00', endTime: '17:00', isAvailable: true },
@@ -331,17 +348,13 @@ app.post('/api/auth/register-doctor', async (req, res) => {
     
     doctors.push(newDoctor);
     
-    // Generate token
-    const token = generateToken({ ...newDoctor, role: 'doctor' });
-    
     // Return doctor without password
     const { passwordHash: _, ...doctorResponse } = newDoctor;
     
     res.status(201).json({
       success: true,
-      message: 'Doctor registered successfully',
-      user: { ...doctorResponse, role: 'doctor' },
-      token
+      message: 'Professional credentials submitted for administrator review',
+      user: { ...doctorResponse, role: 'doctor' }
     });
   } catch (error) {
     console.error('Doctor registration error:', error);
@@ -355,7 +368,6 @@ app.post('/api/auth/register-doctor', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log('Login attempt:', { email, password });
     
     // Validation
     if (!email || !password) {
@@ -367,8 +379,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     // Check users first
     let user = users.find(u => u.email === email);
-    console.log('User found in users array:', user);
-    let role = 'patient';
+    let role = user?.role || 'patient';
     
     // If not found in users, check doctors
     if (!user) {
@@ -391,10 +402,13 @@ app.post('/api/auth/login', async (req, res) => {
         message: 'Invalid email or password' 
       });
     }
+
+    if (user.verificationStatus !== 'approved' || user.isActive === false || (role === 'doctor' && user.isVerified !== true)) {
+      return res.status(403).json({ success: false, message: 'Your account is awaiting administrator approval.' });
+    }
     
     // Generate token
     const token = generateToken({ ...user, role });
-    console.log('Generated Token:', token);
     
     // Return user without password
     const { passwordHash: _, ...userResponse } = user;
@@ -958,6 +972,32 @@ app.get('/api/admin/users', authenticateToken, (req, res) => {
     console.error('Get admin users error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
+});
+
+app.get('/api/admin/verification-queue', authenticateToken, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Access denied' });
+  const pendingPatients = users.filter(user => user.role === 'patient' && user.verificationStatus === 'pending').map(({ passwordHash, ...user }) => ({ ...user, accountType: 'patient' }));
+  const pendingDoctors = doctors.filter(doctor => doctor.verificationStatus === 'pending').map(({ passwordHash, ...doctor }) => ({ ...doctor, accountType: 'doctor' }));
+  res.json({ success: true, submissions: [...pendingPatients, ...pendingDoctors] });
+});
+
+app.put('/api/admin/verification/:accountType/:id', authenticateToken, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Access denied' });
+  const { accountType, id } = req.params;
+  const { decision } = req.body;
+  if (!['approved', 'rejected'].includes(decision) || !['patient', 'doctor'].includes(accountType)) return res.status(400).json({ success: false, message: 'Invalid verification decision' });
+  const collection = accountType === 'doctor' ? doctors : users;
+  const index = collection.findIndex(account => account.id === id);
+  if (index === -1) return res.status(404).json({ success: false, message: 'Account not found' });
+  collection[index] = {
+    ...collection[index], verificationStatus: decision,
+    isActive: accountType === 'patient' ? decision === 'approved' : collection[index].isActive,
+    isVerified: accountType === 'doctor' ? decision === 'approved' : collection[index].isVerified,
+    isAvailable: accountType === 'doctor' ? decision === 'approved' : collection[index].isAvailable,
+    updatedAt: new Date().toISOString()
+  };
+  const { passwordHash, ...account } = collection[index];
+  res.json({ success: true, message: `Account ${decision}`, account });
 });
 
 // ==================== HEALTH CHECK ====================

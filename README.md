@@ -7,6 +7,7 @@ HealthAI is a React and TypeScript healthcare appointment experience with patien
 - Patient workspace: book appointments, view care history, and cancel an upcoming request.
 - Clinician workspace: review consultations and confirm, complete, or cancel them.
 - Administrator workspace: verify clinicians, suspend/restore patient access, and review appointment activity.
+- Identity approval: patient accounts require a government-issued ID, while clinicians require identity, licence, professional registration, workplace, and qualification evidence before administrator approval.
 - Doctor discovery, appointment scheduling, messaging UI, QR appointment lookup, profile tools, and AI-health UI.
 - Offline demo mode backed by browser `localStorage`, plus an Express/PostgreSQL backend path for configured environments.
 
@@ -33,6 +34,15 @@ All demo accounts use password `demo123`.
 | Administrator | `admin@demo.com` |
 
 The seeded clinicians can be browsed in the booking flow. The offline fallback is for local demos only; do not use localStorage credentials or records in a real deployment.
+
+## Verification workflow
+
+1. A patient submits a government identity document and account details, or a clinician submits identity plus professional evidence.
+2. The account is saved with `verificationStatus: pending` and cannot sign in or appear as available.
+3. An administrator approves or rejects it from the administrator workspace (or the protected API verification queue).
+4. Approval changes the account to `approved` and activates patient access or clinician availability.
+
+Documents are held only in the demo's browser/server memory. A real deployment must upload them directly to encrypted private storage, restrict administrator access, encrypt document metadata, keep an audit trail, and enforce a deletion/retention policy.
 
 ## Environment
 
