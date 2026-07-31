@@ -3,6 +3,8 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -1180,15 +1182,28 @@ app.get('/api/messages/unread/count', authenticateToken, (req, res) => {
   }
 });
 
-// ==================== ERROR HANDLING ====================
+// ==================== FRONTEND AND ERROR HANDLING ====================
 
-// 404 handler
-app.use((req, res) => {
+// Serve the production React app from the same port as the API. This makes
+// http://localhost:3001 useful after `npm run build`, while Vite's dev server
+// remains available on port 5173 during development.
+const clientBuild = path.join(__dirname, 'dist');
+const clientEntry = path.join(clientBuild, 'index.html');
+if (fs.existsSync(clientEntry)) {
+  app.use(express.static(clientBuild));
+  app.get(/^(?!\/api\/).*/, (req, res) => res.sendFile(clientEntry));
+}
+
+// Unknown API endpoints should keep returning JSON rather than the SPA shell.
+app.use('/api', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found'
   });
 });
+
+// If no frontend build exists yet, provide a clear root response.
+app.use((req, res) => res.status(404).json({ success: false, message: 'Frontend not built. Run npm run build, or use http://localhost:5173 for Vite development.' }));
 
 // Global error handler
 app.use(errorHandler);
