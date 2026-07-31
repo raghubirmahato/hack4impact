@@ -1,5 +1,4 @@
-// Client-side Database Service for Good Health AI
-// This service makes API calls to the backend instead of direct database connections
+import { resolveApiUrl } from '../utils/apiUrl';
 
 export interface User {
   id: string;
@@ -22,8 +21,11 @@ export interface Doctor {
   name: string;
   email: string;
   phone: string;
+  role?: 'doctor';
   specialization: string;
   yearsOfExperience: number;
+  experience?: number;
+  hospitalAffiliation?: string;
   qualification: string;
   bio?: string;
   rating: number;
@@ -52,6 +54,7 @@ export interface Appointment {
   notes?: string;
   prescription?: any;
   followUpDate?: string;
+  qrCode?: string;
   createdAt: string;
   updatedAt: string;
   
@@ -105,7 +108,7 @@ class ClientDatabaseService {
 
   // User Management
   async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'passwordHash'>, password: string): Promise<User> {
-    const response = await fetch(`${this.baseUrl}/users`, {
+    const response = await fetch(resolveApiUrl(`${this.baseUrl}/users`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -122,7 +125,7 @@ class ClientDatabaseService {
 
   async getUserById(id: string): Promise<User | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/users/${id}`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/users/${id}`));
       if (!response.ok) {
         return null;
       }
@@ -135,7 +138,7 @@ class ClientDatabaseService {
 
   async getUserByEmail(email: string): Promise<User | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/users/email/${email}`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/users/email/${email}`));
       if (!response.ok) {
         return null;
       }
@@ -148,7 +151,7 @@ class ClientDatabaseService {
 
   async getAllUsers(): Promise<User[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/users`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/users`));
       if (!response.ok) {
         return [];
       }
@@ -161,7 +164,7 @@ class ClientDatabaseService {
 
   // Doctor Management
   async createDoctor(doctorData: Omit<Doctor, 'id' | 'createdAt' | 'updatedAt'>): Promise<Doctor> {
-    const response = await fetch(`${this.baseUrl}/doctors`, {
+    const response = await fetch(resolveApiUrl(`${this.baseUrl}/doctors`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -179,7 +182,7 @@ class ClientDatabaseService {
   async getAllDoctors(): Promise<Doctor[]> {
     try {
       // Fetch doctors from API
-      const response = await fetch(`${this.baseUrl}/doctors`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/doctors`));
       let apiDoctors: Doctor[] = [];
       
       if (response.ok) {
@@ -216,7 +219,7 @@ class ClientDatabaseService {
   async getDoctorById(id: string): Promise<Doctor | null> {
     try {
       // First try to fetch from API
-      const response = await fetch(`${this.baseUrl}/doctors/${id}`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/doctors/${id}`));
       if (response.ok) {
         return await response.json();
       }
@@ -277,7 +280,7 @@ class ClientDatabaseService {
 
   async updateAppointmentStatus(id: string, status: Appointment['status']): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/appointments/${id}/status`, {
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/appointments/${id}/status`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -294,7 +297,7 @@ class ClientDatabaseService {
   // Health Tips
   async getAllHealthTips(): Promise<HealthTip[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/health-tips`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/health-tips`));
       if (!response.ok) {
         return [];
       }
@@ -307,7 +310,7 @@ class ClientDatabaseService {
 
   async getFeaturedHealthTips(): Promise<HealthTip[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/health-tips/featured`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/health-tips/featured`));
       if (!response.ok) {
         return [];
       }
@@ -320,7 +323,7 @@ class ClientDatabaseService {
 
   // QR Code Management
   async generateQRCode(patientId: string, appointmentId?: string): Promise<QRCodeData> {
-    const response = await fetch(`${this.baseUrl}/qr-codes`, {
+    const response = await fetch(resolveApiUrl(`${this.baseUrl}/qr-codes`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -337,7 +340,7 @@ class ClientDatabaseService {
 
   async getQRCodesByPatient(patientId: string): Promise<QRCodeData[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/qr-codes/patient/${patientId}`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/qr-codes/patient/${patientId}`));
       if (!response.ok) {
         return [];
       }

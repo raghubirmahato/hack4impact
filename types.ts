@@ -88,6 +88,9 @@ export interface RegisterForm {
   password: string;
   confirmPassword: string;
   role: 'user' | 'doctor';
+  dateOfBirth?: string;
+  gender?: string;
+  address?: string;
 }
 
 export interface DoctorRegistrationForm extends RegisterForm {
@@ -97,6 +100,7 @@ export interface DoctorRegistrationForm extends RegisterForm {
   licenseNumber: string;
   consultationFee: number;
   bio: string;
+  hospitalAffiliation?: string;
 }
 
 export interface BookingForm {

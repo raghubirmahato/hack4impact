@@ -3,44 +3,57 @@ import { GoogleGenAI, GenerateContentResponse, Content } from "@google/genai";
 import type { ChatMessage } from '../types';
 
 // API Key rotation setup
-const API_KEYS = [
-    process.env.GEMINI_API_KEY_1,
-    process.env.GEMINI_API_KEY_2
-].filter(Boolean);
+const getApiKeys = (): string[] => {
+  const keys: (string | undefined)[] = [];
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      keys.push(process.env.GEMINI_API_KEY_1);
+      keys.push(process.env.GEMINI_API_KEY_2);
+      keys.push(process.env.GEMINI_API_KEY);
+      keys.push(process.env.VITE_GEMINI_API_KEY);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return keys.filter((k): k is string => Boolean(k && typeof k === 'string' && k.trim().length > 0));
+};
 
-if (API_KEYS.length === 0) {
-    throw new Error("No valid Gemini API keys found. Please check your environment variables.");
-}
-
+const API_KEYS = getApiKeys();
 let currentKeyIndex = 0;
 let aiInstances: GoogleGenAI[] = [];
 
-// Initialize AI instances for each API key
-API_KEYS.forEach(key => {
-    if (key) {
-        aiInstances.push(new GoogleGenAI({ apiKey: key }));
-    }
-});
+if (API_KEYS.length > 0) {
+  API_KEYS.forEach(key => {
+    aiInstances.push(new GoogleGenAI({ apiKey: key }));
+  });
+} else {
+  console.warn("No Gemini API keys found in environment variables. Gemini features will return fallback messages.");
+}
 
 // Function to get the current AI instance and rotate to next
-const getCurrentAI = (): GoogleGenAI => {
+const getCurrentAI = (): GoogleGenAI | null => {
+    if (aiInstances.length === 0) return null;
     const ai = aiInstances[currentKeyIndex];
     currentKeyIndex = (currentKeyIndex + 1) % aiInstances.length;
-    console.log(`Using API key ${currentKeyIndex === 0 ? API_KEYS.length : currentKeyIndex} of ${API_KEYS.length}`);
+    console.log(`Using API key ${currentKeyIndex === 0 ? aiInstances.length : currentKeyIndex} of ${aiInstances.length}`);
     return ai;
 };
 
 // Function to retry with next API key on rate limit
-const executeWithRetry = async <T>(operation: (ai: GoogleGenAI) => Promise<T>, maxRetries: number = API_KEYS.length): Promise<T> => {
+const executeWithRetry = async <T>(operation: (ai: GoogleGenAI) => Promise<T>, maxRetries: number = Math.max(API_KEYS.length, 1)): Promise<T> => {
+    if (aiInstances.length === 0) {
+        throw new Error("Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.");
+    }
     let lastError: any;
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const ai = getCurrentAI();
+            if (!ai) throw new Error("No available Gemini AI instance.");
             return await operation(ai);
         } catch (error: any) {
             lastError = error;
-            console.warn(`API call failed with key ${currentKeyIndex === 0 ? API_KEYS.length : currentKeyIndex}, trying next key...`, error.message);
+            console.warn(`API call failed with key ${currentKeyIndex === 0 ? aiInstances.length : currentKeyIndex}, trying next key...`, error.message);
             
             // If it's a rate limit error, continue to next key
             if (error.message?.includes('quota') || error.message?.includes('rate') || error.status === 429) {

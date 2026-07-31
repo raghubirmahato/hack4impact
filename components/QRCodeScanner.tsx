@@ -199,13 +199,10 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
     <div className="text-center">
       <div className="inline-block bg-white p-4 rounded-xl shadow-lg">
         {/* Simple QR Code representation - in a real app, you'd use a QR code library */}
-        <div 
-          className="bg-black relative"
-          style={{ width: size, height: size }}
-        >
+        <div className="bg-black relative" style={{ width: size, height: size }}>
           <div className="absolute inset-2 bg-white flex items-center justify-center">
             <div className="text-black text-xs font-mono break-all p-2">
-              {appointment.qrCode}
+              {appointment.qrCode || appointment.id}
             </div>
           </div>
           
@@ -218,7 +215,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
       
       <div className="mt-4 text-center">
         <p className="text-gray-600 text-sm font-medium">Appointment QR Code</p>
-        <p className="text-gray-500 text-xs mt-1">{appointment.qrCode}</p>
+        <p className="text-gray-500 text-xs mt-1">{appointment.qrCode || appointment.id}</p>
         <p className="text-gray-500 text-xs">
           {appointment.patientName} - {new Date(appointment.date).toLocaleDateString()} at {appointment.time}
         </p>

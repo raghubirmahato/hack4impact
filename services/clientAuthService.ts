@@ -2,6 +2,8 @@
 // This service makes API calls to the backend instead of direct database connections
 
 import { clientDatabaseService, User, Doctor, Appointment } from './clientDatabaseService';
+import { STORAGE_KEYS } from '../constants/storage';
+import { resolveApiUrl } from '../utils/apiUrl';
 
 export interface UserData {
   name: string;
@@ -160,6 +162,14 @@ class ClientAuthService {
       localStorage.setItem('goodhealth_users', JSON.stringify(users));
     }
 
+    if (!users.some((user: User) => user.email === 'admin@demo.com')) {
+      users.push({
+        id: 'demo-admin-1', name: 'Platform Admin', email: 'admin@demo.com', phone: '+1234567899',
+        role: 'admin', isActive: true, passwordHash: 'demo123', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+      localStorage.setItem('goodhealth_users', JSON.stringify(users));
+    }
+
     // Add demo doctors if they don't exist (check by ID to avoid duplicates)
     const demoDoctorIds = this.demoDoctors.map(d => d.id);
     const existingDoctorIds = doctors.map((d: any) => d.id);
@@ -176,7 +186,7 @@ class ClientAuthService {
   // User Registration
   async registerUser(userData: UserData, password: string): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/register`, {
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/register`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -207,7 +217,7 @@ class ClientAuthService {
   // Doctor Registration
   async registerDoctor(doctorData: DoctorData, password: string): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/register-doctor`, {
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/register-doctor`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -238,7 +248,7 @@ class ClientAuthService {
   // User Login
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/login`, {
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/login`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -258,11 +268,18 @@ class ClientAuthService {
         };
       }
     } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.'
-      };
+      // Offline demo mode keeps the UI usable without a running API server.
+      const people = [
+        ...JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]'),
+        ...JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCTORS) || '[]')
+      ] as Array<User | Doctor>;
+      const person = people.find(item => item.email.toLowerCase() === credentials.email.trim().toLowerCase() && item.passwordHash === credentials.password);
+      if (person) {
+        const token = `demo.${person.id}.${Date.now()}`;
+        this.setSession(person, token);
+        return { success: true, user: person, token };
+      }
+      return { success: false, message: 'Invalid email or password.' };
     }
   }
 
@@ -270,15 +287,17 @@ class ClientAuthService {
   logout(): void {
     this.currentUser = null;
     this.authToken = null;
-    localStorage.removeItem('goodhealth_auth_token');
-    localStorage.removeItem('goodhealth_current_user');
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem('goodhealth_token');
+    localStorage.removeItem('goodhealth_user');
   }
 
   // Method to reset demo data for testing
   resetDemoData(): void {
-    localStorage.removeItem('goodhealth_users');
-    localStorage.removeItem('goodhealth_doctors');
-    localStorage.removeItem('goodhealth_appointments');
+    localStorage.removeItem(STORAGE_KEYS.USERS);
+    localStorage.removeItem(STORAGE_KEYS.DOCTORS);
+    localStorage.removeItem(STORAGE_KEYS.APPOINTMENTS);
     this.initializeDemoUsers();
   }
 
@@ -436,14 +455,17 @@ class ClientAuthService {
   private setSession(user: User | Doctor, token: string): void {
     this.currentUser = user;
     this.authToken = token;
-    localStorage.setItem('goodhealth_auth_token', token);
-    localStorage.setItem('goodhealth_current_user', JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    // Also save under secondary keys for backward compatibility with booking and chat services
+    localStorage.setItem('goodhealth_token', token);
+    localStorage.setItem('goodhealth_user', JSON.stringify(user));
   }
 
   private restoreSession(): void {
     try {
-      const token = localStorage.getItem('goodhealth_auth_token');
-      const userStr = localStorage.getItem('goodhealth_current_user');
+      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || localStorage.getItem('goodhealth_token');
+      const userStr = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem('goodhealth_user');
       
       if (token && userStr) {
         this.authToken = token;

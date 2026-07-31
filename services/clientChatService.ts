@@ -2,6 +2,14 @@
 // This service handles messaging between patients and doctors
 
 import { User, Doctor } from './clientDatabaseService';
+import { STORAGE_KEYS } from '../constants/storage';
+import { resolveApiUrl } from '../utils/apiUrl';
+
+const getStoredToken = () => localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || localStorage.getItem('goodhealth_token') || '';
+const getStoredUser = () => {
+  const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem('goodhealth_user');
+  return data ? JSON.parse(data) : null;
+};
 
 export interface Message {
   id: string;
@@ -18,21 +26,20 @@ class ClientChatService {
   // Get all messages for the current user
   async getMessages(otherUserId?: string): Promise<Message[]> {
     try {
-      const token = localStorage.getItem('goodhealth_token');
-      const userData = localStorage.getItem('goodhealth_user');
+      const token = getStoredToken();
+      const user = getStoredUser();
       
-      if (!token || !userData) {
+      if (!token || !user) {
         throw new Error('Authentication required');
       }
       
-      const user = JSON.parse(userData);
       let url = `/api/messages/${user.id}`;
       
       if (otherUserId) {
         url = `${url}?with=${otherUserId}`;
       }
       
-      const response = await fetch(url, {
+      const response = await fetch(resolveApiUrl(url), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -56,9 +63,9 @@ class ClientChatService {
   // Send a new message
   async sendMessage(receiverId: string, content: string): Promise<Message | null> {
     try {
-      const token = localStorage.getItem('goodhealth_token');
+      const token = getStoredToken();
       
-      const response = await fetch('/api/messages', {
+      const response = await fetch(resolveApiUrl('/api/messages'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -86,9 +93,9 @@ class ClientChatService {
   // Mark a message as read
   async markMessageAsRead(messageId: string): Promise<boolean> {
     try {
-      const token = localStorage.getItem('goodhealth_token');
+      const token = getStoredToken();
       
-      const response = await fetch(`/api/messages/${messageId}/read`, {
+      const response = await fetch(resolveApiUrl(`/api/messages/${messageId}/read`), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -111,9 +118,9 @@ class ClientChatService {
   // Get unread message count
   async getUnreadMessageCount(): Promise<number> {
     try {
-      const token = localStorage.getItem('goodhealth_token');
+      const token = getStoredToken();
       
-      const response = await fetch('/api/messages/unread/count', {
+      const response = await fetch(resolveApiUrl('/api/messages/unread/count'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

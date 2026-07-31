@@ -1,0 +1,58 @@
+/* Good Health AI - Global CSS Styles */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0f172a;
+  color: #f8fafc;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Utilities */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.panel { border: 1px solid rgba(255,255,255,.10); border-radius: 1rem; background: rgba(15,23,42,.62); backdrop-filter: blur(18px); box-shadow: 0 24px 64px rgba(2,6,23,.24); }
+.eyebrow { margin: 0 0 .5rem; color: #67e8f9; font-size: .75rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.action-secondary { border: 0; border-radius: .5rem; background: rgba(255,255,255,.1); color: white; cursor: pointer; font-size: .75rem; font-weight: 600; padding: .45rem .75rem; }
+.action-secondary:hover { background: rgba(255,255,255,.2); }
+.action-danger { border: 0; border-radius: .5rem; background: rgba(251,113,133,.15); color: #fecdd3; cursor: pointer; font-size: .75rem; font-weight: 600; padding: .45rem .75rem; }
+.action-danger:hover { background: rgba(251,113,133,.25); }

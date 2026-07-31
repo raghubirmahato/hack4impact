@@ -2,14 +2,22 @@
 // This service makes API calls to the backend instead of direct database connections
 
 import { clientDatabaseService, Appointment, Doctor, User } from './clientDatabaseService';
+import { STORAGE_KEYS } from '../constants/storage';
+import { resolveApiUrl } from '../utils/apiUrl';
+
+const getStoredToken = () => localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || localStorage.getItem('goodhealth_token') || '';
+const getStoredUser = () => {
+  const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem('goodhealth_user');
+  return data ? JSON.parse(data) : null;
+};
 
 export interface BookingData {
   doctorId: string;
   patientId: string;
   date: string;
   time: string;
-  duration: number;
-  type: 'consultation' | 'follow-up' | 'emergency';
+  duration?: number;
+  type?: 'consultation' | 'follow-up' | 'emergency';
   symptoms: string;
   notes?: string;
 }
@@ -36,7 +44,7 @@ class ClientBookingService {
   // Get available time slots for a doctor on a specific date
   async getAvailableSlots(doctorId: string, date: string): Promise<TimeSlot[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/slots/${doctorId}/${date}`);
+      const response = await fetch(resolveApiUrl(`${this.baseUrl}/slots/${doctorId}/${date}`));
       if (!response.ok) {
         return [];
       }
@@ -57,11 +65,11 @@ class ClientBookingService {
       }
 
       // Create appointment using the backend API
-      const response = await fetch('/api/appointments', {
+      const response = await fetch(resolveApiUrl('/api/appointments'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('goodhealth_token')}`
+          'Authorization': `Bearer ${getStoredToken()}`
         },
         body: JSON.stringify({
           doctorId: bookingData.doctorId,
@@ -90,13 +98,13 @@ class ClientBookingService {
   // Get appointments for a patient
   async getPatientAppointments(patientId: string): Promise<Appointment[]> {
     try {
-      const token = localStorage.getItem('goodhealth_token');
+      const token = getStoredToken();
       
       if (!token) {
         throw new Error('Authentication required');
       }
       
-      const response = await fetch('/api/appointments', {
+      const response = await fetch(resolveApiUrl('/api/appointments'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -121,13 +129,13 @@ class ClientBookingService {
   // Get appointments for a doctor
   async getDoctorAppointments(doctorId: string): Promise<Appointment[]> {
     try {
-      const token = localStorage.getItem('goodhealth_token');
+      const token = getStoredToken();
       
       if (!token) {
         throw new Error('Authentication required');
       }
       
-      const response = await fetch('/api/appointments', {
+      const response = await fetch(resolveApiUrl('/api/appointments'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -152,13 +160,13 @@ class ClientBookingService {
   // Cancel an appointment
   async cancelAppointment(appointmentId: string): Promise<boolean> {
     try {
-      const token = localStorage.getItem('goodhealth_token');
+      const token = getStoredToken();
       
       if (!token) {
         throw new Error('Authentication required');
       }
       
-      const response = await fetch(`/api/appointments/${appointmentId}/status`, {
+      const response = await fetch(resolveApiUrl(`/api/appointments/${appointmentId}/status`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -179,22 +187,37 @@ class ClientBookingService {
     }
   }
 
+  async updateAppointmentStatus(appointmentId: string, status: 'confirmed' | 'completed' | 'cancelled' | 'no-show'): Promise<boolean> {
+    if (status === 'cancelled') return this.cancelAppointment(appointmentId);
+    if (status === 'confirmed') return this.confirmAppointment(appointmentId);
+    if (status === 'completed') return this.completeAppointment(appointmentId);
+    return this.markNoShow(appointmentId);
+  }
+
+  verifyQRCode(qrCode: string): { success: boolean; appointment?: Appointment; error?: string } {
+    try {
+      const appointments: Appointment[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPOINTMENTS) || '[]');
+      const appointment = appointments.find(item => item.qrCode === qrCode || item.id === qrCode);
+      return appointment ? { success: true, appointment } : { success: false, error: 'No appointment matches this code.' };
+    } catch {
+      return { success: false, error: 'Unable to read appointment data.' };
+    }
+  }
+
   // Reschedule an appointment
   async rescheduleAppointment(appointmentId: string, newDate: string, newTime: string): Promise<boolean> {
     try {
-      const token = localStorage.getItem('goodhealth_token');
+      const token = getStoredToken();
       
       if (!token) {
         throw new Error('Authentication required');
       }
       
       // First get the current user data
-      const userData = localStorage.getItem('goodhealth_user');
-      if (!userData) {
+      const user = getStoredUser();
+      if (!user) {
         throw new Error('User data not found');
       }
-      
-      const user = JSON.parse(userData);
       
       // Get the appointment to check availability
       const appointments = await this.getPatientAppointments(user.id);
@@ -213,7 +236,7 @@ class ClientBookingService {
       }
       
       // Update the appointment with new date and time
-      const response = await fetch(`/api/appointments/${appointmentId}`, {
+      const response = await fetch(resolveApiUrl(`/api/appointments/${appointmentId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -241,11 +264,11 @@ class ClientBookingService {
   // Confirm an appointment (for doctors)
   async confirmAppointment(appointmentId: string): Promise<boolean> {
     try {
-      const response = await fetch(`/api/appointments/${appointmentId}/status`, {
+      const response = await fetch(resolveApiUrl(`/api/appointments/${appointmentId}/status`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('goodhealth_token')}`
+          'Authorization': `Bearer ${getStoredToken()}`
         },
         body: JSON.stringify({ status: 'confirmed' })
       });
@@ -265,11 +288,11 @@ class ClientBookingService {
   // Decline an appointment (for doctors)
   async declineAppointment(appointmentId: string, reason: string = ''): Promise<boolean> {
     try {
-      const response = await fetch(`/api/appointments/${appointmentId}/status`, {
+      const response = await fetch(resolveApiUrl(`/api/appointments/${appointmentId}/status`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('goodhealth_token')}`
+          'Authorization': `Bearer ${getStoredToken()}`
         },
         body: JSON.stringify({ 
           status: 'declined',
@@ -292,11 +315,11 @@ class ClientBookingService {
   // Complete an appointment (for doctors)
   async completeAppointment(appointmentId: string): Promise<boolean> {
     try {
-      const response = await fetch(`/api/appointments/${appointmentId}/status`, {
+      const response = await fetch(resolveApiUrl(`/api/appointments/${appointmentId}/status`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('goodhealth_token')}`
+          'Authorization': `Bearer ${getStoredToken()}`
         },
         body: JSON.stringify({ status: 'completed' })
       });
@@ -316,11 +339,11 @@ class ClientBookingService {
   // Mark appointment as no-show
   async markNoShow(appointmentId: string): Promise<boolean> {
     try {
-      const response = await fetch(`/api/appointments/${appointmentId}/status`, {
+      const response = await fetch(resolveApiUrl(`/api/appointments/${appointmentId}/status`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('goodhealth_token')}`
+          'Authorization': `Bearer ${getStoredToken()}`
         },
         body: JSON.stringify({ status: 'no-show' })
       });

@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '../services/clientAuthService';
-import type { User } from '../services/clientDatabaseService';
+import type { User, Doctor } from '../services/clientDatabaseService';
 
 interface AuthContextType {
-  user: User | null;
+  user: User | Doctor | null;
+  /** Backwards-compatible alias used by messaging and profile screens. */
+  currentUser: User | Doctor | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<User | Doctor>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isDoctor: boolean;
@@ -27,7 +29,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | Doctor | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email: string, password: string): Promise<User> => {
+  const login = async (email: string, password: string): Promise<User | Doctor> => {
     const result = await authService.login({ email, password });
     if (result.success && result.user) {
       setUser(result.user);
@@ -60,6 +62,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const value: AuthContextType = {
     user,
+    currentUser: user,
     loading,
     login,
     logout,
