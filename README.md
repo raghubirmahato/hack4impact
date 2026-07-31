@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (normally `http://localhost:5173`). For the API server in a separate terminal:
+Open the URL Vite prints (normally `http://localhost:3001`). For the API server in a separate terminal:
 
 ```bash
 npm run server
